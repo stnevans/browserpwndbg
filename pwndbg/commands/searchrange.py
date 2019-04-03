@@ -26,14 +26,14 @@ parser.description = '''Find a pointer to another page. Searches a memory region
 
 @pwndbg.commands.ParsedCommand
 @pwndbg.commands.OnlyWhenRunning
-def searchrange(page_start_address=0x0,page_end_address=0x0,search_start_address=0x0,search_end_address=0x0):
-    if search_end_address == 0x0:
-        print("Invalid arguments provided. Please provide 4 addresses.\nThe format is page_start page_end search_start search_end")
+def searchrange(search_start_address=0x0,search_end_address=0x0,page_start_address=0x0,page_end_address=0x0):
+    if page_end_address == 0x0:
+        print("Invalid arguments provided. Please provide 4 addresses.\nThe format is search_start search_end page_start page_end")
         return
     if page_start_address >= page_end_address:
         print("The page start address should be less than the page end address")
     if search_start_address >= search_end_address:
-        print("The search start address should be less than the search end address")
+        print("The search start address should be less than the search end address. " + hex(search_start_address) + "-" + hex(search_end_address    ))
     
     pages = pwndbg.vmmap.get()
     realPages = []
@@ -58,7 +58,6 @@ def searchrange(page_start_address=0x0,page_end_address=0x0,search_start_address
         for addr in range(start,end,8):
             result = pwndbg.memory.pvoid(addr)
             if result >= page_start_address and result <= page_end_address:
-                print(hex(addr))
                 print(pwndbg.chain.format(addr))
 
 
@@ -66,4 +65,4 @@ def searchrange(page_start_address=0x0,page_end_address=0x0,search_start_address
 
     
     if pwndbg.qemu.is_qemu():
-        print("\n[QEMU target detected - locate result might not be accurate; see `help vmmap`]")
+        print("\n[QEMU target detected - searchrange result might not be accurate; see `help vmmap`]")
