@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Command to print the virtual memory map a la /proc/self/maps.
+Command to what page a virtual address is contained by.
 """
 from __future__ import absolute_import
 from __future__ import division

@@ -54,6 +54,7 @@ import pwndbg.commands.windbg
 import pwndbg.commands.xinfo
 import pwndbg.commands.xor
 import pwndbg.commands.locate
+import pwndbg.commands.searchrange
 import pwndbg.constants
 import pwndbg.disasm
 import pwndbg.disasm.arm
@@ -121,7 +122,8 @@ __all__ = [
 'typeinfo',
 'ui',
 'vmmap',
-'locate'
+'locate',
+'searchrange'
 ]
 
 pwndbg.prompt.set_prompt()
