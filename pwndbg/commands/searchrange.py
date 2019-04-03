@@ -54,8 +54,8 @@ def searchrange(search_start_address=0x0,search_end_address=0x0,page_start_addre
         if not pwndbg.memory.peek(start):
             print("Unable to read memory in one region.")
             break
-
-        for addr in range(start,end,8):
+        #Test pwndbg.arch.ptrsize
+        for addr in range(start,end,pwndbg.arch.ptrsize):
             result = pwndbg.memory.pvoid(addr)
             if result >= page_start_address and result <= page_end_address:
                 print(pwndbg.chain.format(addr))

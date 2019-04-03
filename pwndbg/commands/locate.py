@@ -36,7 +36,8 @@ def locate(address=0x0):
     
     for page in pages:
         if address >= page.vaddr and address <= page.vaddr + page.memsz:
-            print(M.get(page.vaddr, text=str(page)))
+            texta = str(page) + " + " + hex(int(address-page.vaddr))
+            print(M.get(page.vaddr, text=texta))
 
     if pwndbg.qemu.is_qemu():
         print("\n[QEMU target detected - locate result might not be accurate; see `help vmmap`]")
