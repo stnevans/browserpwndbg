@@ -59,10 +59,18 @@ def dbg_print_map(maps):
     for child, parentInfo in maps.items():
         print(hex(child) + "("+hex(parentInfo[0])+","+hex(parentInfo[1])+")")
 
+parser = argparse.ArgumentParser()
+parser.description = 'Find a leak by doing a BFS with addresses near a given address'
+parser.add_argument("address",help="Address to find a leak from.")
+parser.add_argument("max_offset",default=0x40,nargs="?",help="Max Offset to add to addresses when looking for leak.")
+parser.add_argument("max_depth",default=0x4,nargs="?",help="Maximum depth to follow pointers to.")
+parser.add_argument("binary_name",type=str,nargs="?",default=None,help="Substring required to be part of the name of any found pages")
+parser.add_argument("pointer_tagging",default=True,nargs="?",type=bool,help="Enable pointer tagging")
 
-@pwndbg.commands.ParsedCommand
+@pwndbg.commands.ArgparsedCommand(parser)
+#@pwndbg.commands.ParsedCommand
 @pwndbg.commands.OnlyWhenRunning
-def leakfind(address=0x0,max_offset=0x40,max_depth=0x3,binary_name=None,pointer_tagging=True):
+def leakfind(address=0x0,max_offset=0x40,max_depth=0x4,binary_name=None,pointer_tagging=True):
     if address == 0x0:
         print("Invalid argument provided. Please give a valid address such as 0x")
         return
