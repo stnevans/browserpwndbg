@@ -55,6 +55,7 @@ import pwndbg.commands.xinfo
 import pwndbg.commands.xor
 import pwndbg.commands.locate
 import pwndbg.commands.searchrange
+import pwndbg.commands.leakfind
 import pwndbg.constants
 import pwndbg.disasm
 import pwndbg.disasm.arm
@@ -123,7 +124,8 @@ __all__ = [
 'ui',
 'vmmap',
 'locate',
-'searchrange'
+'searchrange',
+'leakfind'
 ]
 
 pwndbg.prompt.set_prompt()
