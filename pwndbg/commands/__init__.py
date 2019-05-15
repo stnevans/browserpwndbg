@@ -48,9 +48,10 @@ class Command(gdb.Command):
     builtin_override_whitelist = {'up', 'down', 'search', 'pwd', 'start'}
     history = {}
 
-    def __init__(self, function, prefix=False):
-        command_name = function.__name__
-
+    def __init__(self, function, prefix=False, command_name=None):
+        if command_name is None:
+            command_name = function.__name__
+        
         super(Command, self).__init__(command_name, gdb.COMMAND_USER, gdb.COMPLETE_EXPRESSION, prefix=prefix)
         self.function = function
 
@@ -237,6 +238,16 @@ def OnlyWhenHeapIsInitialized(function):
             print("%s: Heap is not initialized yet." % function.__name__)
     return _OnlyWhenHeapIsInitialized
 
+def OnlyWithLibcDebugSyms(function):
+    @functools.wraps(function)
+    def _OnlyWithLibcDebugSyms(*a, **kw):
+        if pwndbg.heap.current.libc_has_debug_syms():
+            return function(*a, **kw)
+        else:
+            print('''%s: This command only works with libc debug symbols.
+They can probably be installed via the package manager of your choice.
+See also: https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html''' % function.__name__)
+    return _OnlyWithLibcDebugSyms
 
 class QuietSloppyParsedCommand(ParsedCommand):
     def __init__(self, *a, **kw):
@@ -246,11 +257,14 @@ class QuietSloppyParsedCommand(ParsedCommand):
 
 
 class _ArgparsedCommand(Command):
-    def __init__(self, parser, function, *a, **kw):
+    def __init__(self, parser, function, command_name=None, *a, **kw):
         self.parser = parser
-        self.parser.prog = function.__name__
+        if command_name is None:
+            self.parser.prog = function.__name__
+        else:
+            self.parser.prog = command_name
         self.__doc__ = function.__doc__ = self.parser.description
-        super(_ArgparsedCommand, self).__init__(function, *a, **kw)
+        super(_ArgparsedCommand, self).__init__(function, command_name=command_name, *a, **kw)
 
     def split_args(self, argument):
         argv = gdb.string_to_argv(argument)
@@ -259,7 +273,7 @@ class _ArgparsedCommand(Command):
 
 class ArgparsedCommand(object):
     """Adds documentation and offloads parsing for a Command via argparse"""
-    def __init__(self, parser_or_desc):
+    def __init__(self, parser_or_desc, aliases=[]):
         """
         :param parser_or_desc: `argparse.ArgumentParser` instance or `str`
         """
@@ -267,7 +281,7 @@ class ArgparsedCommand(object):
             self.parser = argparse.ArgumentParser(description=parser_or_desc)
         else:
             self.parser = parser_or_desc
-
+        self.aliases = aliases
         # We want to run all integer and otherwise-unspecified arguments
         # through fix() so that GDB parses it.
         for action in self.parser._actions:
@@ -279,6 +293,8 @@ class ArgparsedCommand(object):
                 action.help += ' (default: %(default)s)'
 
     def __call__(self, function):
+        for alias in self.aliases:
+            _ArgparsedCommand(self.parser, function, alias)
         return _ArgparsedCommand(self.parser, function)
 
 

@@ -227,7 +227,8 @@ def here():
 @withIDA
 @takes_address
 def Jump(addr):
-    return _ida.Jump(addr)
+    # uses C++ api instead of idc one to avoid activating the IDA window
+    return _ida.jumpto(addr, -1, 0)
 
 
 @withIDA
@@ -389,6 +390,13 @@ def has_cached_cfunc(addr):
 @pwndbg.memoize.reset_on_stop
 def decompile(addr):
     return _ida.decompile(addr)
+
+
+@withHexrays
+@takes_address
+@pwndbg.memoize.reset_on_stop
+def decompile_context(pc, context_lines):
+    return _ida.decompile_context(pc, context_lines)
 
 
 @withIDA

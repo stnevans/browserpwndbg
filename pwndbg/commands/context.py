@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import argparse
 import ast
 import codecs
 import ctypes
@@ -82,14 +83,22 @@ def output():
         return open(str( config_output ), "w")
 
 # @pwndbg.events.stop
-@pwndbg.commands.Command
+
+parser = argparse.ArgumentParser()
+parser.description = "Print out the current register, instruction, and stack context."
+parser.add_argument("subcontext", nargs="*", type=str, default=None, help="Submenu to display: 'reg', 'disasm', 'code', 'stack', 'backtrace', and/or 'args'")
+@pwndbg.commands.ArgparsedCommand(parser)
 @pwndbg.commands.OnlyWhenRunning
-def context(*args):
+def context(subcontext=None):
     """
     Print out the current register, instruction, and stack context.
 
     Accepts subcommands 'reg', 'disasm', 'code', 'stack', 'backtrace', and 'args'.
     """
+    if subcontext is None:
+        subcontext = []
+    args = subcontext
+    
     if len(args) == 0:
         args = config_context_sections.split()
 
@@ -115,10 +124,12 @@ def context(*args):
 def context_regs():
     return [pwndbg.ui.banner("registers")] + get_regs()
 
-
-@pwndbg.commands.Command
+parser = argparse.ArgumentParser()
+parser.description = '''Print out all registers and enhance the information.'''
+parser.add_argument("regs", nargs="*", type=str, default=None, help="Registers to be shown")
+@pwndbg.commands.ArgparsedCommand(parser)
 @pwndbg.commands.OnlyWhenRunning
-def regs(*regs):
+def regs(regs=None):
     '''Print out all registers and enhance the information.'''
     print('\n'.join(get_regs(*regs)))
 
@@ -221,78 +232,77 @@ def get_highlight_source(filename):
     source_lines = tuple(line.rstrip() for line in source_lines)
     return source_lines
 
+def get_filename_and_formatted_source():
+    """
+    Returns formatted, lines limited and highlighted source as list
+    or if it isn't there - an empty list
+    """
+    sal = gdb.selected_frame().find_sal()  # gdb.Symtab_and_line
+
+    # Check if source code is available
+    if sal.symtab is None:
+        return '', []
+
+    # Get the full source code
+    closest_line = sal.line
+    filename = sal.symtab.fullname()
+
+    try:
+        source = get_highlight_source(filename)
+    except IOError:
+        return '', []
+
+    if not source:
+        return '', []
+
+    n = int(source_code_lines)
+
+    # Compute the line range
+    start = max(closest_line - 1 - n//2, 0)
+    end = min(closest_line - 1 + n//2 + 1, len(source))
+    num_width = len(str(end))
+
+    # split the code
+    source = source[start:end]
+
+    # Compute the prefix_sign length
+    prefix_sign = pwndbg.config.code_prefix
+    prefix_width = len(prefix_sign)
+
+    # Format the output
+    formatted_source = []
+    for line_number, code in enumerate(source, start=start + 1):
+        fmt = ' {prefix_sign:{prefix_width}} {line_number:>{num_width}} {code}'
+        if pwndbg.config.highlight_source and line_number == closest_line:
+            fmt = C.highlight(fmt)
+
+        line = fmt.format(
+            prefix_sign=C.prefix(prefix_sign) if line_number == closest_line else '',
+            prefix_width=prefix_width,
+            line_number=line_number,
+            num_width=num_width,
+            code=code
+        )
+        formatted_source.append(line)
+
+    return filename, formatted_source
+
 
 def context_code():
-    try:
-        # Compute the closest pc and line number
-        symtab = gdb.selected_frame().find_sal().symtab
-        linetable = symtab.linetable()
+    filename, formatted_source = get_filename_and_formatted_source()
 
-        closest_pc = -1
-        closest_line = -1
-        for line in linetable:
-            real_address = ctypes.c_uint64(line.pc).value
-            # print("line is %d, address is %s" % (line.line, hex(real_address)))
-            if closest_pc < real_address <= pwndbg.regs.pc:
-                closest_line = line.line
-                closest_pc   = real_address
+    # Try getting source from files
+    if formatted_source:
+        return [pwndbg.ui.banner("Source (code)"), 'In file: %s' % filename] + formatted_source
 
-        if closest_line < 0:
-            return []
-
-        # Get the full source code
-        filename = symtab.fullname()
-        source = get_highlight_source(filename)
-
-        # If it starts on line 1, it's not really using the
-        # correct source code.
-        if not source or closest_line <= 1:
-            return []
-
-        n = int(source_code_lines)
-
-        # Compute the line range
-        start = max(closest_line - 1 - n//2, 0)
-        end = min(closest_line - 1 + n//2 + 1, len(source))
-        num_width = len(str(end))
-
-        # split the code
-        source = source[start:end]
-
-        # Compute the prefix_sign length
-        prefix_sign = pwndbg.config.code_prefix
-        prefix_width = len(prefix_sign)
-
-        # Format the output
-        formatted_source = []
-        for line_number, code in enumerate(source, start=start + 1):
-            fmt = ' {prefix_sign:{prefix_width}} {line_number:>{num_width}} {code}'
-            if pwndbg.config.highlight_source and line_number == closest_line:
-                fmt = C.highlight(fmt)
-
-            line = fmt.format(
-                prefix_sign=C.prefix(prefix_sign) if line_number == closest_line else '',
-                prefix_width=prefix_width,
-                line_number=line_number,
-                num_width=num_width,
-                code=code
-            )
-            formatted_source.append(line)
-
-        banner = [pwndbg.ui.banner("Source (code)"), 'In file: %s' % filename]
-        banner.extend(formatted_source)
-        return banner
-    except:
-        pass
-
+    # Try getting source from IDA Pro Hex-Rays Decompiler
     if not pwndbg.ida.available():
         return []
 
-    name = pwndbg.ida.GetFunctionName(pwndbg.regs.pc)
-    addr = pwndbg.ida.LocByName(name)
+    n = int(int(int(source_code_lines) / 2)) # int twice to make it a real int instead of inthook
     # May be None when decompilation failed or user loaded wrong binary in IDA
-    code = pwndbg.ida.decompile(addr)
-
+    code = pwndbg.ida.decompile_context(pwndbg.regs.pc, n)
+    
     if code:
         return [pwndbg.ui.banner("Hexrays pseudocode")] + code.splitlines()
     else:
