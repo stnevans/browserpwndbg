@@ -127,7 +127,6 @@ __all__ = [
 pwndbg.prompt.set_prompt()
 
 pre_commands = """
-set confirm off
 set verbose off
 set pagination off
 set height 0
